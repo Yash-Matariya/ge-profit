@@ -1,0 +1,27 @@
+# Build output
+build/
+target/
+out/
+dist/
+*.class
+*.jar
+# The wrapper jar is committed on purpose: it is what lets anyone clone and
+# build with the exact Gradle version this project expects.
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+.gradle/
+
+# Node
+node_modules/
+*.log
+
+# Environment - real values never get committed
+.env
+.env.local
+
+# Editors and OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

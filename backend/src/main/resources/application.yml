@@ -1,0 +1,58 @@
+spring:
+  application:
+    name: ge-profit-backend
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/geprofit}
+    username: ${DATABASE_USER:geprofit}
+    password: ${DATABASE_PASSWORD:geprofit}
+
+  jpa:
+    # Flyway owns the schema. Hibernate must never change it.
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 500
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+geprofit:
+  wiki:
+    # The OSRS Wiki real-time prices API.
+    base-url: https://prices.runescape.wiki/api/v1/osrs
+    # The Wiki asks every client to identify itself and give a contact. Anonymous
+    # or generic agents get blocked, and rightly so.
+    user-agent: "ge-profit - GE analytics - contact: yash.matariya.2002@gmail.com"
+    timeout-seconds: 20
+
+  ingest:
+    # Prices refresh server-side; every client reads our database, so the Wiki
+    # sees one poller no matter how many dashboards and plugins are open.
+    enabled: ${INGEST_ENABLED:true}
+    latest-interval-ms: 60000      # /latest - every minute
+    history-interval-ms: 300000    # /5m - every five minutes, appended as history
+    mapping-interval-ms: 86400000  # /mapping - daily; it barely changes
+
+  tax:
+    # Grand Exchange sales tax. These are settings, not constants, because the
+    # rate, the cap and the exemption have all changed during OSRS's lifetime.
+    # Verify against the live game before trusting the numbers.
+    rate: 0.02
+    cap: 5000000
+    exempt-below: 50
+
+  # Item ids used by the processing calculators.
+  items:
+    nature-rune: 561
+    vial-of-water: 227
+
+logging:
+  level:
+    com.geprofit: INFO
