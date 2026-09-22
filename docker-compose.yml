@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: geprofit
+      POSTGRES_USER: geprofit
+      POSTGRES_PASSWORD: geprofit
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The backend waits for this, so it does not start against a database
+      # that is still initialising and then die on the first connection.
+      test: ["CMD-SHELL", "pg_isready -U geprofit -d geprofit"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
