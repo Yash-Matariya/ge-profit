@@ -1,6 +1,5 @@
 package com.geprofit.ingest;
 
-import com.geprofit.config.GeProfitProperties;
 import com.geprofit.domain.Item;
 import com.geprofit.domain.LatestPrice;
 import com.geprofit.domain.PriceHistory;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,70 +44,15 @@ public class PriceIngestionService {
     private final ItemRepository items;
     private final LatestPriceRepository latestPrices;
     private final PriceHistoryRepository history;
-    private final GeProfitProperties props;
 
     public PriceIngestionService(WikiPricesClient wiki,
                                  ItemRepository items,
                                  LatestPriceRepository latestPrices,
-                                 PriceHistoryRepository history,
-                                 GeProfitProperties props) {
+                                 PriceHistoryRepository history) {
         this.wiki = wiki;
         this.items = items;
         this.latestPrices = latestPrices;
         this.history = history;
-        this.props = props;
-    }
-
-    // ---- scheduled entry points --------------------------------------------
-
-    @Scheduled(initialDelay = 0,
-            fixedDelayString = "${geprofit.ingest.mapping-interval-ms}")
-    public void scheduledMapping() {
-        if (!enabled()) {
-            return;
-        }
-        try {
-            int n = refreshCatalogue();
-            log.info("Catalogue refreshed: {} items", n);
-        } catch (Exception e) {
-            log.warn("Catalogue refresh failed; keeping the previous catalogue", e);
-        }
-    }
-
-    @Scheduled(initialDelay = 5_000,
-            fixedDelayString = "${geprofit.ingest.latest-interval-ms}")
-    public void scheduledLatest() {
-        if (!enabled()) {
-            return;
-        }
-        try {
-            int n = refreshLatestPrices();
-            log.debug("Latest prices refreshed: {} items", n);
-        } catch (Exception e) {
-            log.warn("Latest price refresh failed; serving the previous prices", e);
-        }
-    }
-
-    @Scheduled(initialDelay = 15_000,
-            fixedDelayString = "${geprofit.ingest.history-interval-ms}")
-    public void scheduledHistory() {
-        if (!enabled()) {
-            return;
-        }
-        try {
-            int n = archiveFiveMinuteWindow();
-            log.debug("Archived {} history rows", n);
-        } catch (Exception e) {
-            log.warn("History archive failed; this window is a gap", e);
-        }
-    }
-
-    /**
-     * Turning ingestion off lets a second instance run as a read-only replica
-     * without two pollers hammering the Wiki.
-     */
-    private boolean enabled() {
-        return props.ingest().enabled();
     }
 
     // ---- the work ----------------------------------------------------------
@@ -214,6 +157,8 @@ public class PriceIngestionService {
         latestPrices.findAll().forEach(p -> priceRows.put(p.getItemId(), p));
 
         List<PriceHistory> rows = new ArrayList<>();
+        List<LatestPrice> volumeUpdates = new ArrayList<>();
+
         for (Map.Entry<String, WikiPricesClient.FiveMinutePoint> e : window.data().entrySet()) {
             Integer id = parseId(e.getKey());
             WikiPricesClient.FiveMinutePoint p = e.getValue();
@@ -224,8 +169,10 @@ public class PriceIngestionService {
             long lowVol = p.lowPriceVolume() == null ? 0 : p.lowPriceVolume();
 
             // Volumes belong on the current-price row too, so the flip finder
-            // can filter on liquidity without touching the history table.
-            priceRows.get(id).updateVolumes(highVol, lowVol);
+            // can filter on liquidity without joining the history table.
+            LatestPrice row = priceRows.get(id);
+            row.updateVolumes(highVol, lowVol);
+            volumeUpdates.add(row);
 
             if (history.existsByItemIdAndCapturedAt(id, capturedAt)) {
                 continue;
@@ -233,6 +180,13 @@ public class PriceIngestionService {
             rows.add(new PriceHistory(id, p.avgHighPrice(), p.avgLowPrice(),
                     highVol, lowVol, capturedAt));
         }
+
+        // Saved explicitly rather than left to dirty checking. Relying on the
+        // persistence context to notice the mutation is what hid a real bug
+        // here: with no transaction actually applied, these entities were
+        // detached and every volume silently stayed null while the history
+        // rows wrote fine, so ingestion looked healthy.
+        latestPrices.saveAll(volumeUpdates);
         history.saveAll(rows);
         return rows.size();
     }

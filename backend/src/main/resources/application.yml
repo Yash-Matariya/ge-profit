@@ -3,7 +3,9 @@ spring:
     name: ge-profit-backend
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/geprofit}
+    # 5433 matches docker-compose, which avoids a locally-installed Postgres
+    # already holding 5432. See the comment in docker-compose.yml.
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/geprofit}
     username: ${DATABASE_USER:geprofit}
     password: ${DATABASE_PASSWORD:geprofit}
 

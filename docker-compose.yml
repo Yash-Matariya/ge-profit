@@ -6,7 +6,11 @@ services:
       POSTGRES_USER: geprofit
       POSTGRES_PASSWORD: geprofit
     ports:
-      - "5432:5432"
+      # 5433 on the host, not 5432. A locally-installed Postgres commonly owns
+      # 5432, and it binds localhost specifically while Docker binds the
+      # wildcard -- so localhost:5432 silently reaches the native server and
+      # you get "role does not exist" from a database you did not mean to use.
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
