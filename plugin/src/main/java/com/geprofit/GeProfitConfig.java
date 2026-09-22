@@ -65,4 +65,30 @@ public interface GeProfitConfig extends Config
 	{
 		return 60;
 	}
+
+	// Using the backend sends your IP to a server run by this plugin's author,
+	// not to the Wiki. That is a bigger ask than the Wiki itself, so it is its
+	// own opt-in with its own warning rather than being folded into the setting
+	// above.
+	@ConfigItem(
+		keyName = "useBackend",
+		name = "Use the GE Profit backend",
+		description = "Fetch ranked flips from a GE Profit server instead of computing them in the client. "
+			+ "The server applies the same tax and buy-limit rules as the website and keeps price history.",
+		warning = "This feature submits your IP address to a 3rd-party server not controlled or verified by RuneLite developers"
+	)
+	default boolean useBackend()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = "backendUrl",
+		name = "Backend URL",
+		description = "Where your GE Profit backend is running. Only used when the option above is enabled."
+	)
+	default String backendUrl()
+	{
+		return "http://localhost:8080";
+	}
 }

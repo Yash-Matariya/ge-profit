@@ -5,14 +5,31 @@
  * genuinely harder to scan. The full number stays available as a tooltip, so
  * nothing is lost -- this is presentation, never used in a calculation.
  */
+const UNITS = [
+  { threshold: 1_000_000_000, suffix: "b" },
+  { threshold: 1_000_000, suffix: "m" },
+  { threshold: 1_000, suffix: "k" },
+] as const;
+
 export function gp(value: number): string {
   const sign = value < 0 ? "-" : "";
   const n = Math.abs(value);
 
-  if (n >= 1_000_000_000) return `${sign}${trim(n / 1_000_000_000)}b`;
-  if (n >= 1_000_000) return `${sign}${trim(n / 1_000_000)}m`;
-  if (n >= 1_000) return `${sign}${trim(n / 1_000)}k`;
-  return `${sign}${n}`;
+  // UNITS runs largest first, so this is the biggest unit the number fills.
+  let unit = UNITS.findIndex((u) => n >= u.threshold);
+  if (unit === -1) {
+    return `${sign}${n}`;
+  }
+
+  let scaled = n / UNITS[unit].threshold;
+  // Rounding to one decimal can reach 1000: 999,999 is 999.999k, which would
+  // print as "1000k". Step up to the larger unit so it reads as "1m".
+  if (Number(scaled.toFixed(1)) >= 1000 && unit > 0) {
+    unit -= 1;
+    scaled = n / UNITS[unit].threshold;
+  }
+
+  return `${sign}${trim(scaled)}${UNITS[unit].suffix}`;
 }
 
 function trim(n: number): string {
