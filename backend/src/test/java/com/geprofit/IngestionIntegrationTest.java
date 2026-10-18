@@ -120,8 +120,8 @@ class IngestionIntegrationTest {
         ingestion.refreshCatalogue();
 
         when(wiki.latest()).thenReturn(Map.of(
-                "2", new WikiPricesClient.LatestPoint(200, 1_700_000_000L, 190, 1_700_000_000L),
-                "99999", new WikiPricesClient.LatestPoint(5, 1_700_000_000L, 4, 1_700_000_000L)));
+                "2", new WikiPricesClient.LatestPoint(200L, 1_700_000_000L, 190L, 1_700_000_000L),
+                "99999", new WikiPricesClient.LatestPoint(5L, 1_700_000_000L, 4L, 1_700_000_000L)));
 
         int n = ingestion.refreshLatestPrices();
 
@@ -138,12 +138,12 @@ class IngestionIntegrationTest {
         when(wiki.mapping()).thenReturn(List.of(mapping(2, "Cannonball", 30, 6)));
         ingestion.refreshCatalogue();
         when(wiki.latest()).thenReturn(Map.of(
-                "2", new WikiPricesClient.LatestPoint(200, 1_700_000_000L, 190, 1_700_000_000L)));
+                "2", new WikiPricesClient.LatestPoint(200L, 1_700_000_000L, 190L, 1_700_000_000L)));
         ingestion.refreshLatestPrices();
 
         long windowTs = 1_700_000_100L;
         when(wiki.fiveMinute()).thenReturn(new WikiPricesClient.FiveMinute(
-                windowTs, Map.of("2", new WikiPricesClient.FiveMinutePoint(200, 500L, 190, 400L))));
+                windowTs, Map.of("2", new WikiPricesClient.FiveMinutePoint(200L, 500L, 190L, 400L))));
 
         int first = ingestion.archiveFiveMinuteWindow();
         int second = ingestion.archiveFiveMinuteWindow();
@@ -161,10 +161,10 @@ class IngestionIntegrationTest {
         when(wiki.mapping()).thenReturn(List.of(mapping(2, "Cannonball", 30, 6)));
         ingestion.refreshCatalogue();
         when(wiki.latest()).thenReturn(Map.of(
-                "2", new WikiPricesClient.LatestPoint(200, 1_700_000_000L, 190, 1_700_000_000L)));
+                "2", new WikiPricesClient.LatestPoint(200L, 1_700_000_000L, 190L, 1_700_000_000L)));
         ingestion.refreshLatestPrices();
         when(wiki.fiveMinute()).thenReturn(new WikiPricesClient.FiveMinute(
-                1_700_000_100L, Map.of("2", new WikiPricesClient.FiveMinutePoint(200, 500L, 190, 400L))));
+                1_700_000_100L, Map.of("2", new WikiPricesClient.FiveMinutePoint(200L, 500L, 190L, 400L))));
 
         ingestion.archiveFiveMinuteWindow();
 
@@ -177,22 +177,39 @@ class IngestionIntegrationTest {
         when(wiki.mapping()).thenReturn(List.of(mapping(2, "Cannonball", 30, 6)));
         ingestion.refreshCatalogue();
         when(wiki.latest()).thenReturn(Map.of(
-                "2", new WikiPricesClient.LatestPoint(200, 1_700_000_000L, 190, 1_700_000_000L)));
+                "2", new WikiPricesClient.LatestPoint(200L, 1_700_000_000L, 190L, 1_700_000_000L)));
         ingestion.refreshLatestPrices();
 
         // Two windows: mid-points of 195 and 205, so the average is 200.
         long base = Instant.now().minusSeconds(600).getEpochSecond();
         when(wiki.fiveMinute()).thenReturn(new WikiPricesClient.FiveMinute(
-                base, Map.of("2", new WikiPricesClient.FiveMinutePoint(200, 10L, 190, 10L))));
+                base, Map.of("2", new WikiPricesClient.FiveMinutePoint(200L, 10L, 190L, 10L))));
         ingestion.archiveFiveMinuteWindow();
         when(wiki.fiveMinute()).thenReturn(new WikiPricesClient.FiveMinute(
-                base + 300, Map.of("2", new WikiPricesClient.FiveMinutePoint(210, 10L, 200, 10L))));
+                base + 300, Map.of("2", new WikiPricesClient.FiveMinutePoint(210L, 10L, 200L, 10L))));
         ingestion.archiveFiveMinuteWindow();
 
         Double average = history.averagePriceSince(2, Instant.now().minusSeconds(3600));
 
         assertThat(history.count()).isEqualTo(2);
         assertThat(average).isEqualTo(200.0);
+    }
+
+    @Test
+    @DisplayName("an item priced beyond what the game can hold doesn't stop anyone else's price being stored")
+    void impossiblePriceIsDroppedForThatItemOnly() {
+        when(wiki.mapping()).thenReturn(List.of(mapping(2, "Cannonball", 30, 6), mapping(3, "Odd item", 1, 6)));
+        ingestion.refreshCatalogue();
+        when(wiki.latest()).thenReturn(Map.of(
+                "2", new WikiPricesClient.LatestPoint(200L, 1_700_000_000L, 190L, 1_700_000_000L),
+                "3", new WikiPricesClient.LatestPoint(9_100_000_000L, 1_700_000_000L, 150L, 1_700_000_000L)));
+
+        ingestion.refreshLatestPrices();
+
+        assertThat(prices.findById(2).orElseThrow().sellAt()).isEqualTo(200);
+        LatestPrice odd = prices.findById(3).orElseThrow();
+        assertThat(odd.sellAt()).isNull();      // the impossible high is "no price"
+        assertThat(odd.buyAt()).isEqualTo(150); // its real low is kept
     }
 
     @Test

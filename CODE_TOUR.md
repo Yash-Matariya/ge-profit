@@ -54,7 +54,7 @@ Two indexes earn their place: `(item_id, captured_at DESC)` because every histor
 
 Isolating it means ingestion can be tested with a fake, and that the two obligations this free, volunteer-run API places on callers are honoured in exactly one place: **identify yourself** with a descriptive User-Agent, and **poll politely**.
 
-> **Probe — "how do you test against a third-party API?"** → "I don't. The client is mocked in tests. Hitting a live volunteer-run service from a test suite would be slow, flaky and rude. What I test is what I do with the data."
+> **Probe — "how do you test against a third-party API?"** → "I don't. The client is mocked in tests. Hitting a live volunteer-run service from a test suite would be slow, flaky and rude. What I test is what I do with the data. Plus one test that parses a real-shaped response, added after the API sent a price too big for an int and the parse silently dropped every price for a week."
 
 ## 7. `ingest/PriceIngestionService.java` — the heart of the backend
 

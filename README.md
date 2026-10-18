@@ -106,11 +106,20 @@ Then enable **Fetch live prices** in the plugin settings — network access is o
 ## Tests
 
 ```bash
-cd backend && ./gradlew test     # 35 tests
+cd backend && ./gradlew test     # 47 tests
 cd web && npm test               # 9 tests
+cd plugin && ./gradlew test      # 4 tests: the plugin's own tax and price checks
 ```
 
 The backend's unit tests mock the repository and need no services. The integration tests use **Testcontainers with real Postgres**, because the things they verify — the Flyway migration, the foreign keys, and the unique index that makes archiving idempotent — only exist in Postgres. An in-memory database would pass while the real schema was broken.
+
+## The bug that froze the prices
+
+For a week the dashboard showed the same prices, with every test passing. On 2026-10-01 the Wiki API reported one item at 9,100,000,000 gp. The response was parsed into `Integer` fields, Jackson refused a number that size, and the whole batch of about 4,000 prices was thrown away, every five minutes. The only visible sign was the "Priced" column saying "7 days ago".
+
+The fix reads prices as `Long` and turns anything the game itself can't hold (above `Integer.MAX_VALUE`, or negative) into "no price" for that one item, in `WikiPricesClient.gp()`. Two lessons stayed in the tests: `WikiPricesParsingTest` parses the real response shape, because the ingestion tests mock the client and so never parsed anything; and one item with an impossible price must not stop everyone else's from being stored.
+
+The plugin's direct-to-Wiki mode had the same `Integer` fields and the same failure, shown as "Couldn't read the price data". It now reads `Long` and skips that one item too (`GePricesService.fitsInGame`), and it ranks by a full buy limit's profit, the same order as the backend.
 
 ## A note on the price API
 

@@ -60,6 +60,16 @@ class FlipServiceTest {
     }
 
     @Test
+    @DisplayName("the default query ranks by potential profit, so nobody can quietly switch it back to margin")
+    void defaultSortIsPotentialProfit() {
+        given(row(1, "Big margin, tiny limit", 100_000, 110_000, 8, 5000, false),
+              row(2, "Small margin, huge limit", 100, 160, 13_000, 5000, false));
+
+        assertThat(FlipQuery.defaults().sort()).isEqualTo(FlipQuery.Sort.POTENTIAL_PROFIT);
+        assertThat(service.find(FlipQuery.defaults()).get(0).itemId()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("an item with no published buy limit counts as one unit, not unlimited")
     void missingBuyLimitIsTreatedAsOne() {
         given(row(1, "No limit published", 100, 200, null, 1000, false));

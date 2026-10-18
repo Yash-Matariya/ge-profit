@@ -81,16 +81,33 @@ public class WikiPricesClient {
     public record Envelope<T>(Map<String, T> data) {
     }
 
-    public record LatestPoint(Integer high, Long highTime, Integer low, Long lowTime) {
+    // Prices are read as Long, not Integer. On 2026-10-01 the API reported an
+    // item at 9,100,000,000 gp, which doesn't fit in an int: Jackson threw,
+    // and the whole batch of ~4,000 prices was dropped, every five minutes,
+    // for a week, while the dashboard kept showing week-old numbers. A price
+    // the game itself can't hold is turned into "no price" by gp() instead.
+    public record LatestPoint(Long high, Long highTime, Long low, Long lowTime) {
+    }
+
+    /**
+     * A price as the game can hold it, or null. A Grand Exchange price is an
+     * int in the game, so anything above Integer.MAX_VALUE (or below zero) is
+     * bad data for that one item, not a reason to reject everyone else's.
+     */
+    public static Integer gp(Long price) {
+        if (price == null || price < 0 || price > Integer.MAX_VALUE) {
+            return null;
+        }
+        return price.intValue();
     }
 
     /** The /5m response carries its own window timestamp, which we key history on. */
     public record FiveMinute(Long timestamp, Map<String, FiveMinutePoint> data) {
     }
 
-    public record FiveMinutePoint(Integer avgHighPrice,
+    public record FiveMinutePoint(Long avgHighPrice,
                                   Long highPriceVolume,
-                                  Integer avgLowPrice,
+                                  Long avgLowPrice,
                                   Long lowPriceVolume) {
     }
 

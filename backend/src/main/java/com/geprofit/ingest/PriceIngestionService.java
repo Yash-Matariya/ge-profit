@@ -129,7 +129,8 @@ public class PriceIngestionService {
                 continue;
             }
             LatestPrice row = existing.computeIfAbsent(id, LatestPrice::new);
-            row.update(p.high(), p.low(), toInstant(p.highTime()), toInstant(p.lowTime()));
+            row.update(WikiPricesClient.gp(p.high()), WikiPricesClient.gp(p.low()),
+                    toInstant(p.highTime()), toInstant(p.lowTime()));
             toSave.add(row);
         }
         latestPrices.saveAll(toSave);
@@ -177,7 +178,7 @@ public class PriceIngestionService {
             if (history.existsByItemIdAndCapturedAt(id, capturedAt)) {
                 continue;
             }
-            rows.add(new PriceHistory(id, p.avgHighPrice(), p.avgLowPrice(),
+            rows.add(new PriceHistory(id, WikiPricesClient.gp(p.avgHighPrice()), WikiPricesClient.gp(p.avgLowPrice()),
                     highVol, lowVol, capturedAt));
         }
 

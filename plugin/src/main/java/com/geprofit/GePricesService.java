@@ -70,7 +70,7 @@ public class GePricesService
 
 	/**
 	 * Refresh prices and hand back the flips that pass the given filters, best
-	 * margin first. Runs off-thread; the callback fires on an OkHttp thread, so
+	 * full-limit profit first. Runs off-thread; the callback fires on an OkHttp thread, so
 	 * the caller must marshal any UI work onto the Swing thread.
 	 */
 	public void findFlips(int minMargin, int minHourlyVolume, int maxBuyPrice,
@@ -107,11 +107,11 @@ public class GePricesService
 		for (Map.Entry<String, PricePoint> e : latest.entrySet())
 		{
 			PricePoint p = e.getValue();
-			if (p == null || p.high == null || p.low == null || p.high <= p.low)
+			if (p == null || !fitsInGame(p.high) || !fitsInGame(p.low) || p.high <= p.low)
 			{
 				continue;
 			}
-			int buy = p.low, sell = p.high;
+			int buy = p.low.intValue(), sell = p.high.intValue();
 			if (maxBuyPrice > 0 && buy > maxBuyPrice)
 			{
 				continue;
@@ -131,11 +131,25 @@ public class GePricesService
 			}
 			MappingItem m = mapping.get(id);
 			String name = m != null ? m.name : "Item " + id;
-			int limit = m != null && m.limit != null ? m.limit : 0;
+			// No published limit counts as one unit, as the backend does, rather than
+			// zero, which would sink the item to the bottom of the ranking.
+			int limit = m != null && m.limit != null && m.limit > 0 ? m.limit : 1;
 			flips.add(new FlipItem(id, name, buy, sell, tax, margin, limit, hourly));
 		}
-		flips.sort(Comparator.comparingInt(FlipItem::getMargin).reversed());
+		// Same ranking as the backend: what a full buy limit is worth, not the
+		// raw margin, so the panel shows the same order in both modes.
+		flips.sort(Comparator.comparingLong(FlipItem::marginPerLimit).reversed());
 		return flips;
+	}
+
+	/**
+	 * A Grand Exchange price is an int in the game. The API has reported an item
+	 * at 9,100,000,000 gp, which is bad data for that one item; reading prices
+	 * as Integer made Gson reject the whole response, so no flips showed at all.
+	 */
+	static boolean fitsInGame(Long price)
+	{
+		return price != null && price > 0 && price <= Integer.MAX_VALUE;
 	}
 
 	private void fetchMapping(Runnable onDone, Consumer<String> onError)
@@ -198,8 +212,9 @@ public class GePricesService
 
 	private static class PricePoint
 	{
-		Integer high;
-		Integer low;
+		// Long, not Integer: see fitsInGame.
+		Long high;
+		Long low;
 	}
 
 	private static class VolResponse

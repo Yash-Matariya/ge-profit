@@ -90,10 +90,10 @@ class SchedulerTransactionTest {
         when(wiki.mapping()).thenReturn(List.of(
                 new WikiPricesClient.MappingItem(2, "Cannonball", "A ball.", false, 11_000, 6, 4, 5)));
         when(wiki.latest()).thenReturn(Map.of(
-                "2", new WikiPricesClient.LatestPoint(200, 1_700_000_000L, 190, 1_700_000_000L)));
+                "2", new WikiPricesClient.LatestPoint(200L, 1_700_000_000L, 190L, 1_700_000_000L)));
         when(wiki.fiveMinute()).thenReturn(new WikiPricesClient.FiveMinute(
                 1_700_000_100L,
-                Map.of("2", new WikiPricesClient.FiveMinutePoint(200, 500L, 190, 400L))));
+                Map.of("2", new WikiPricesClient.FiveMinutePoint(200L, 500L, 190L, 400L))));
     }
 
     @Test
